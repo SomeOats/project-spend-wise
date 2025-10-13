@@ -15,11 +15,19 @@ const Forecasts = () => {
   const [forecasts, setForecasts] = useLocalStorage<Forecast[]>('forecasts', []);
   const [resources] = useLocalStorage<Resource[]>('resources', []);
   const [projects] = useLocalStorage<Project[]>('projects', []);
+  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [monthInput, setMonthInput] = useState('');
   const [allocationInput, setAllocationInput] = useState('');
+
+  // Filter resources to only show those with end date >= selected year or no end date
+  const activeResources = resources.filter(r => {
+    if (!r.endDate) return true;
+    const endYear = new Date(r.endDate).getFullYear();
+    return endYear >= selectedYear;
+  });
 
   const handleAddForecast = () => {
     if (!selectedResource || !selectedProject) {
@@ -80,10 +88,10 @@ const Forecasts = () => {
   const getResourceName = (id: string) => resources.find(r => r.id === id)?.fullName || 'Unknown';
   const getProjectName = (pvNumber: string) => projects.find(p => p.pvNumber === pvNumber)?.name || 'Unknown';
 
+  // Generate all 12 months for the selected year
   const months = Array.from({ length: 12 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(date.getMonth() + i);
-    return date.toISOString().slice(0, 7);
+    const month = (i + 1).toString().padStart(2, '0');
+    return `${selectedYear}-${month}`;
   });
 
   return (
@@ -110,7 +118,7 @@ const Forecasts = () => {
                       <SelectValue placeholder="Select resource" />
                     </SelectTrigger>
                     <SelectContent>
-                      {resources.map((resource) => (
+                      {activeResources.map((resource) => (
                         <SelectItem key={resource.id} value={resource.id}>
                           {resource.fullName}
                         </SelectItem>
@@ -144,9 +152,11 @@ const Forecasts = () => {
           </Dialog>
         </div>
 
-        {resources.length === 0 || projects.length === 0 ? (
+        {activeResources.length === 0 || projects.length === 0 ? (
           <div className="rounded-md border p-8 text-center text-muted-foreground">
-            Please add resources and projects before creating forecasts.
+            {activeResources.length === 0 
+              ? `No active resources available for ${selectedYear}. Resources must have an end date in or after ${selectedYear}.`
+              : 'Please add resources and projects before creating forecasts.'}
           </div>
         ) : (
           <div className="rounded-md border overflow-x-auto">

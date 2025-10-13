@@ -8,6 +8,14 @@ const Summary = () => {
   const [forecasts] = useLocalStorage<Forecast[]>('forecasts', []);
   const [resources] = useLocalStorage<Resource[]>('resources', []);
   const [projects] = useLocalStorage<Project[]>('projects', []);
+  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
+
+  // Filter resources to only show those with end date >= selected year or no end date
+  const activeResources = resources.filter(r => {
+    if (!r.endDate) return true;
+    const endYear = new Date(r.endDate).getFullYear();
+    return endYear >= selectedYear;
+  });
 
   const calculateTotalByResource = (resourceId: string): number => {
     return forecasts
@@ -16,10 +24,11 @@ const Summary = () => {
         const resource = resources.find(r => r.id === resourceId);
         if (!resource) return total;
         
-        const allocationTotal = Object.values(forecast.allocations).reduce(
-          (sum, allocation) => sum + (resource.rate * allocation) / 100,
-          0
-        );
+        // Only sum allocations for the selected year
+        const allocationTotal = Object.entries(forecast.allocations)
+          .filter(([month]) => new Date(month).getFullYear() === selectedYear)
+          .reduce((sum, [_, allocation]) => sum + (resource.rate * allocation) / 100, 0);
+        
         return total + allocationTotal;
       }, 0);
   };
@@ -31,15 +40,16 @@ const Summary = () => {
         const resource = resources.find(r => r.id === forecast.resourceId);
         if (!resource) return total;
         
-        const allocationTotal = Object.values(forecast.allocations).reduce(
-          (sum, allocation) => sum + (resource.rate * allocation) / 100,
-          0
-        );
+        // Only sum allocations for the selected year
+        const allocationTotal = Object.entries(forecast.allocations)
+          .filter(([month]) => new Date(month).getFullYear() === selectedYear)
+          .reduce((sum, [_, allocation]) => sum + (resource.rate * allocation) / 100, 0);
+        
         return total + allocationTotal;
       }, 0);
   };
 
-  const overallTotal = resources.reduce((total, resource) => 
+  const overallTotal = activeResources.reduce((total, resource) => 
     total + calculateTotalByResource(resource.id), 0
   );
 
@@ -60,10 +70,10 @@ const Summary = () => {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Active Resources</CardTitle>
+              <CardTitle>Active Resources ({selectedYear})</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold text-primary">{resources.length}</p>
+              <p className="text-3xl font-bold text-primary">{activeResources.length}</p>
             </CardContent>
           </Card>
           <Card>
@@ -90,14 +100,14 @@ const Summary = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {resources.length === 0 ? (
+                  {activeResources.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={2} className="text-center text-muted-foreground">
-                        No resources available
+                        No active resources available for {selectedYear}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    resources.map((resource) => {
+                    activeResources.map((resource) => {
                       const total = calculateTotalByResource(resource.id);
                       return (
                         <TableRow key={resource.id}>

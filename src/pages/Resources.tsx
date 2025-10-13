@@ -13,9 +13,17 @@ import { toast } from '@/hooks/use-toast';
 
 const Resources = () => {
   const [resources, setResources] = useLocalStorage<Resource[]>('resources', []);
+  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [formData, setFormData] = useState<Partial<Resource>>({});
+
+  // Filter resources to only show those with end date >= selected year or no end date
+  const displayedResources = resources.filter(r => {
+    if (!r.endDate) return true;
+    const endYear = new Date(r.endDate).getFullYear();
+    return endYear >= selectedYear;
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,14 +173,14 @@ const Resources = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {resources.length === 0 ? (
+              {displayedResources.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No resources found. Add your first resource to get started.
+                    No active resources found for {selectedYear}. Resources must have an end date in or after {selectedYear}.
                   </TableCell>
                 </TableRow>
               ) : (
-                resources.map((resource) => (
+                displayedResources.map((resource) => (
                   <TableRow key={resource.id}>
                     <TableCell className="font-medium">{resource.fullName}</TableCell>
                     <TableCell>${resource.rate.toFixed(2)}</TableCell>

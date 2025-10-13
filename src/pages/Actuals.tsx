@@ -15,8 +15,22 @@ const Actuals = () => {
   const [actuals, setActuals] = useLocalStorage<Actual[]>('actuals', []);
   const [resources] = useLocalStorage<Resource[]>('resources', []);
   const [projects] = useLocalStorage<Project[]>('projects', []);
+  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState<Partial<Actual>>({});
+
+  // Filter resources to only show those with end date >= selected year or no end date
+  const activeResources = resources.filter(r => {
+    if (!r.endDate) return true;
+    const endYear = new Date(r.endDate).getFullYear();
+    return endYear >= selectedYear;
+  });
+
+  // Filter actuals to only show those in the selected year
+  const filteredActuals = actuals.filter(a => {
+    const actualYear = new Date(a.month).getFullYear();
+    return actualYear === selectedYear;
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,7 +86,7 @@ const Actuals = () => {
                       <SelectValue placeholder="Select resource" />
                     </SelectTrigger>
                     <SelectContent>
-                      {resources.map((resource) => (
+                      {activeResources.map((resource) => (
                         <SelectItem key={resource.id} value={resource.id}>
                           {resource.fullName}
                         </SelectItem>
@@ -130,9 +144,11 @@ const Actuals = () => {
           </Dialog>
         </div>
 
-        {resources.length === 0 || projects.length === 0 ? (
+        {activeResources.length === 0 || projects.length === 0 ? (
           <div className="rounded-md border p-8 text-center text-muted-foreground">
-            Please add resources and projects before entering actuals.
+            {activeResources.length === 0 
+              ? `No active resources available for ${selectedYear}. Resources must have an end date in or after ${selectedYear}.`
+              : 'Please add resources and projects before entering actuals.'}
           </div>
         ) : (
           <div className="rounded-md border">
@@ -147,14 +163,14 @@ const Actuals = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {actuals.length === 0 ? (
+                {filteredActuals.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No actuals found. Add your first actual to get started.
+                      No actuals found for {selectedYear}. Add your first actual to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  actuals.map((actual) => (
+                  filteredActuals.map((actual) => (
                     <TableRow key={actual.id}>
                       <TableCell className="font-medium">{getResourceName(actual.resourceId)}</TableCell>
                       <TableCell>{getProjectName(actual.projectPvNumber)}</TableCell>
