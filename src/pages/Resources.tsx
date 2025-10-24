@@ -28,9 +28,18 @@ const Resources = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.fullName || !formData.rate || !formData.company) {
+    if (!formData.id || !formData.fullName || !formData.rate || !formData.company) {
       toast({ title: 'Error', description: 'Please fill in all required fields', variant: 'destructive' });
       return;
+    }
+
+    // Check for unique ID when adding new resource
+    if (!editingResource) {
+      const idExists = resources.some(r => r.id === formData.id);
+      if (idExists) {
+        toast({ title: 'Error', description: 'This ID already exists. Please use a unique ID.', variant: 'destructive' });
+        return;
+      }
     }
 
     if (editingResource) {
@@ -39,7 +48,6 @@ const Resources = () => {
     } else {
       const newResource: Resource = {
         ...formData as Resource,
-        id: crypto.randomUUID(),
       };
       setResources([...resources, newResource]);
       toast({ title: 'Success', description: 'Resource added successfully' });
@@ -85,6 +93,17 @@ const Resources = () => {
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="id">ID *</Label>
+                    <Input
+                      id="id"
+                      value={formData.id || ''}
+                      onChange={(e) => setFormData({ ...formData, id: e.target.value })}
+                      disabled={!!editingResource}
+                      required
+                      placeholder="Enter unique ID"
+                    />
+                  </div>
                   <div>
                     <Label htmlFor="fullName">Full Name *</Label>
                     <Input
@@ -163,6 +182,7 @@ const Resources = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>ID</TableHead>
                 <TableHead>Full Name</TableHead>
                 <TableHead>Rate</TableHead>
                 <TableHead>Location</TableHead>
@@ -175,14 +195,15 @@ const Resources = () => {
             <TableBody>
               {displayedResources.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No active resources found for {selectedYear}. Resources must have an end date in or after {selectedYear}.
                   </TableCell>
                 </TableRow>
               ) : (
                 displayedResources.map((resource) => (
                   <TableRow key={resource.id}>
-                    <TableCell className="font-medium">{resource.fullName}</TableCell>
+                    <TableCell className="font-medium">{resource.id}</TableCell>
+                    <TableCell>{resource.fullName}</TableCell>
                     <TableCell>${resource.rate.toFixed(2)}</TableCell>
                     <TableCell>{resource.location}</TableCell>
                     <TableCell>{resource.company}</TableCell>
