@@ -36,12 +36,21 @@ const Actuals = () => {
     return actual?.capitalCost;
   };
 
-  // Update or create an actual entry
-  const handleActualChange = (resourceId: string, projectPvNumber: string, month: string, value: number) => {
+  // Update or create an actual entry, or delete if value is null
+  const handleActualChange = (resourceId: string, projectPvNumber: string, month: string, value: number | null) => {
     const existingActual = actuals.find(
       a => a.resourceId === resourceId && a.projectPvNumber === projectPvNumber && a.month === month
     );
 
+    // If value is null or empty, delete the actual entry
+    if (value === null) {
+      if (existingActual) {
+        setActuals(actuals.filter(a => a.id !== existingActual.id));
+      }
+      return;
+    }
+
+    // Otherwise, update or create the actual entry
     if (existingActual) {
       setActuals(actuals.map(a => 
         a.id === existingActual.id ? { ...a, capitalCost: value } : a
@@ -156,9 +165,15 @@ const Actuals = () => {
                               min="0"
                               value={actualValue ?? ''}
                               onChange={(e) => {
-                                const value = parseFloat(e.target.value);
-                                if (!isNaN(value)) {
-                                  handleActualChange(combo.resourceId, combo.projectPvNumber, actualMonth, value);
+                                const inputValue = e.target.value;
+                                // If empty, set to null to delete the actual
+                                if (inputValue === '' || inputValue === null) {
+                                  handleActualChange(combo.resourceId, combo.projectPvNumber, actualMonth, null);
+                                } else {
+                                  const value = parseFloat(inputValue);
+                                  if (!isNaN(value) && value >= 0) {
+                                    handleActualChange(combo.resourceId, combo.projectPvNumber, actualMonth, value);
+                                  }
                                 }
                               }}
                               className="w-full text-center"
