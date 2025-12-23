@@ -3,7 +3,7 @@ import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Forecast, Resource, Project } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -159,67 +159,71 @@ const Forecasts = () => {
               : 'Please add resources and projects before creating forecasts.'}
           </div>
         ) : (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 bg-card z-10">Resource</TableHead>
-                  <TableHead className="sticky left-0 bg-card z-10">Project</TableHead>
+          <div className="border rounded overflow-auto max-h-[calc(100vh-200px)]">
+            <table className="w-full border-collapse text-sm">
+              <thead className="sticky top-0 z-20 bg-muted">
+                <tr>
+                  <th className="sticky left-0 z-30 bg-muted border border-border px-2 py-1 text-left font-medium min-w-[150px]">
+                    Resource
+                  </th>
+                  <th className="sticky left-[150px] z-30 bg-muted border border-border px-2 py-1 text-left font-medium min-w-[150px]">
+                    Project
+                  </th>
                   {months.map((month) => (
-                    <TableHead key={month} className="text-center min-w-[150px]">
-                      {new Date(month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    <th key={month} className="border border-border px-2 py-1 text-center font-medium min-w-[100px]">
+                      <div>{new Date(month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
                       <div className="text-xs font-normal text-muted-foreground">% / Cost</div>
-                    </TableHead>
+                    </th>
                   ))}
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  <th className="border border-border px-2 py-1 text-center font-medium w-[60px]">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 {forecasts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={months.length + 3} className="text-center text-muted-foreground">
+                  <tr>
+                    <td colSpan={months.length + 3} className="border border-border px-2 py-4 text-center text-muted-foreground">
                       No forecasts found. Add your first forecast to get started.
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ) : (
                   forecasts.map((forecast) => (
-                    <TableRow key={forecast.id}>
-                      <TableCell className="sticky left-0 bg-card font-medium">
+                    <tr key={forecast.id} className="hover:bg-muted/50">
+                      <td className="sticky left-0 z-10 bg-background border border-border px-2 py-1 font-medium">
                         {getResourceName(forecast.resourceId)}
-                      </TableCell>
-                      <TableCell className="sticky left-0 bg-card">
+                      </td>
+                      <td className="sticky left-[150px] z-10 bg-background border border-border px-2 py-1">
                         {getProjectName(forecast.projectPvNumber)}
-                      </TableCell>
+                      </td>
                       {months.map((month) => (
-                        <TableCell key={month} className="text-center">
-                          <div className="flex flex-col gap-1">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="100"
-                              value={forecast.allocations[month] || ''}
-                              onChange={(e) =>
-                                handleAllocationChange(forecast.id, month, parseFloat(e.target.value) || 0)
-                              }
-                              className="w-full text-center"
-                              placeholder="0"
-                            />
-                            <div className="text-xs text-muted-foreground">
-                              ${calculateMonthlyCost(forecast, month).toFixed(2)}
-                            </div>
+                        <td key={month} className="border border-border px-1 py-0.5 text-center">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={forecast.allocations[month] || ''}
+                            onChange={(e) =>
+                              handleAllocationChange(forecast.id, month, parseFloat(e.target.value) || 0)
+                            }
+                            className="h-7 w-full text-center border-0 bg-transparent p-0 text-sm focus-visible:ring-1"
+                            placeholder="0"
+                          />
+                          <div className="text-xs text-muted-foreground">
+                            ${calculateMonthlyCost(forecast, month).toFixed(2)}
                           </div>
-                        </TableCell>
+                        </td>
                       ))}
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(forecast.id)}>
+                      <td className="border border-border px-1 py-0.5 text-center">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(forecast.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))
                 )}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </div>
         )}
       </main>
