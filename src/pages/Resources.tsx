@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Resource } from '@/types';
@@ -14,17 +14,28 @@ import { DataTable } from '@/components/ui/data-table';
 
 const Resources = () => {
   const [resources, setResources] = useLocalStorage<Resource[]>('resources', []);
-  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   const [formData, setFormData] = useState<Partial<Resource>>({});
 
-  // Filter resources to only show those with end date >= selected year or no end date
   const displayedResources = resources.filter(r => {
     if (!r.endDate) return true;
     const endYear = new Date(r.endDate).getFullYear();
     return endYear >= selectedYear;
   });
+
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([JSON.stringify(resources, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'resources-export.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [resources]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +45,6 @@ const Resources = () => {
       return;
     }
 
-    // Check for unique ID when adding new resource
     if (!editingResource) {
       const idExists = resources.some(r => r.id === formData.id);
       if (idExists) {
@@ -47,10 +57,7 @@ const Resources = () => {
       setResources(resources.map(r => r.id === editingResource.id ? { ...formData as Resource, id: editingResource.id } : r));
       toast({ title: 'Success', description: 'Resource updated successfully' });
     } else {
-      const newResource: Resource = {
-        ...formData as Resource,
-      };
-      setResources([...resources, newResource]);
+      setResources([...resources, formData as Resource]);
       toast({ title: 'Success', description: 'Resource added successfully' });
     }
 
@@ -59,16 +66,16 @@ const Resources = () => {
     setFormData({});
   };
 
-  const handleEdit = (resource: Resource) => {
+  const handleEdit = useCallback((resource: Resource) => {
     setEditingResource(resource);
     setFormData(resource);
     setIsDialogOpen(true);
-  };
+  }, []);
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     setResources(resources.filter(r => r.id !== id));
     toast({ title: 'Success', description: 'Resource deleted successfully' });
-  };
+  }, [resources, setResources]);
 
   const openAddDialog = () => {
     setEditingResource(null);
@@ -123,11 +130,11 @@ const Resources = () => {
         </div>
       ),
     },
-  ], []);
+  ], [handleEdit, handleDelete]);
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Navigation selectedYear={selectedYear} onYearChange={setSelectedYear} onDownload={handleDownload} />
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-foreground">Resources</h2>

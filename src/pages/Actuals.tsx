@@ -1,23 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Actual, Resource, Project, Forecast } from '@/types';
 import { Input } from '@/components/ui/input';
 import { addMonths, format, parse } from 'date-fns';
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/ui/data-table';
 
 interface ActualRow {
   resourceId: string;
@@ -31,25 +19,34 @@ const Actuals = () => {
   const [forecasts] = useLocalStorage<Forecast[]>('forecasts', []);
   const [resources] = useLocalStorage<Resource[]>('resources', []);
   const [projects] = useLocalStorage<Project[]>('projects', []);
-  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
+
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([JSON.stringify(actuals, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'actuals-export.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [actuals]);
 
   const getResourceName = (id: string) => resources.find(r => r.id === id)?.fullName || 'Unknown';
   const getProjectName = (pvNumber: string) => projects.find(p => p.pvNumber === pvNumber)?.name || 'Unknown';
 
-  // Generate all 12 months for the selected year
   const months = Array.from({ length: 12 }, (_, i) => {
     const month = (i + 1).toString().padStart(2, '0');
     return `${selectedYear}-${month}`;
   });
 
-  // Get the previous month for a given month string (YYYY-MM)
   const getPreviousMonth = (monthStr: string): string => {
     const date = parse(monthStr, 'yyyy-MM', new Date());
     const prevDate = addMonths(date, -1);
     return format(prevDate, 'yyyy-MM');
   };
 
-  // Get actual value for a specific resource/project/month combination
   const getActualValue = (resourceId: string, projectPvNumber: string, month: string): number | undefined => {
     const actual = actuals.find(
       a => a.resourceId === resourceId && a.projectPvNumber === projectPvNumber && a.month === month
@@ -57,13 +54,11 @@ const Actuals = () => {
     return actual?.capitalCost;
   };
 
-  // Update or create an actual entry, or delete if value is null
-  const handleActualChange = (resourceId: string, projectPvNumber: string, month: string, value: number | null) => {
+  const handleActualChange = useCallback((resourceId: string, projectPvNumber: string, month: string, value: number | null) => {
     const existingActual = actuals.find(
       a => a.resourceId === resourceId && a.projectPvNumber === projectPvNumber && a.month === month
     );
 
-    // If value is null or empty, delete the actual entry
     if (value === null) {
       if (existingActual) {
         setActuals(actuals.filter(a => a.id !== existingActual.id));
@@ -71,7 +66,6 @@ const Actuals = () => {
       return;
     }
 
-    // Otherwise, update or create the actual entry
     if (existingActual) {
       setActuals(actuals.map(a => 
         a.id === existingActual.id ? { ...a, capitalCost: value } : a
@@ -86,10 +80,20 @@ const Actuals = () => {
       };
       setActuals([...actuals, newActual]);
     }
+  }, [actuals, setActuals]);
+
+  const hasForecastForMonth = (resourceId: string, projectPvNumber: string, forecastMonth: string): boolean => {
+    const forecast = forecasts.find(
+      f => f.resourceId === resourceId && f.projectPvNumber === projectPvNumber
+    );
+    
+    if (!forecast) return false;
+    
+    const allocation = forecast.allocations[forecastMonth];
+    return allocation !== undefined && allocation > 0;
   };
 
-  // Get all unique resource-project combinations from forecasts
-  const getUniqueResourceProjectCombos = (): ActualRow[] => {
+  const uniqueCombos: ActualRow[] = useMemo(() => {
     const combos = new Map<string, ActualRow>();
     
     forecasts.forEach(forecast => {
@@ -103,21 +107,7 @@ const Actuals = () => {
     });
     
     return Array.from(combos.values());
-  };
-
-  // Check if a forecast has allocation for a given month
-  const hasForecastForMonth = (resourceId: string, projectPvNumber: string, forecastMonth: string): boolean => {
-    const forecast = forecasts.find(
-      f => f.resourceId === resourceId && f.projectPvNumber === projectPvNumber
-    );
-    
-    if (!forecast) return false;
-    
-    const allocation = forecast.allocations[forecastMonth];
-    return allocation !== undefined && allocation > 0;
-  };
-
-  const uniqueCombos = useMemo(() => getUniqueResourceProjectCombos(), [forecasts, resources, projects]);
+  }, [forecasts, resources, projects]);
 
   const columns: ColumnDef<ActualRow>[] = useMemo(() => [
     {
@@ -175,17 +165,11 @@ const Actuals = () => {
         },
       };
     }),
-  ], [months, actuals, forecasts]);
-
-  const table = useReactTable({
-    data: uniqueCombos,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
+  ], [months, actuals, forecasts, handleActualChange]);
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Navigation selectedYear={selectedYear} onYearChange={setSelectedYear} onDownload={handleDownload} />
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-foreground">Actuals</h2>
@@ -199,45 +183,11 @@ const Actuals = () => {
             No forecasts available. Please create forecasts before entering actuals.
           </div>
         ) : (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                      No forecast allocations found. Actuals will appear when forecasts are added.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={uniqueCombos}
+            emptyMessage="No forecast allocations found. Actuals will appear when forecasts are added."
+          />
         )}
       </main>
     </div>

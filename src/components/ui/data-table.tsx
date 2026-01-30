@@ -3,6 +3,7 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  TableOptions,
 } from '@tanstack/react-table';
 
 import {
@@ -13,17 +14,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   emptyMessage?: string;
+  stickyHeader?: boolean;
+  maxHeight?: string;
+  className?: string;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
   emptyMessage = 'No results.',
+  stickyHeader = false,
+  maxHeight,
+  className,
 }: DataTableProps<TData, TValue>) {
   const table = useReactTable({
     data,
@@ -32,9 +40,16 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="rounded-md border">
+    <div 
+      className={cn(
+        'rounded-md border',
+        maxHeight && 'overflow-auto',
+        className
+      )}
+      style={maxHeight ? { maxHeight } : undefined}
+    >
       <Table>
-        <TableHeader>
+        <TableHeader className={cn(stickyHeader && 'sticky top-0 z-10 bg-muted')}>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
