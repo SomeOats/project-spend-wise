@@ -1,8 +1,24 @@
+import { useMemo } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Forecast, Resource, Project } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/ui/data-table';
+
+interface ResourceSummary {
+  id: string;
+  fullName: string;
+  totalCost: number;
+}
+
+interface ProjectSummary {
+  pvNumber: string;
+  name: string;
+  totalCost: number;
+  budget: number | undefined;
+  isOverBudget: boolean;
+}
 
 const Summary = () => {
   const [forecasts] = useLocalStorage<Forecast[]>('forecasts', []);
@@ -53,6 +69,64 @@ const Summary = () => {
     total + calculateTotalByResource(resource.id), 0
   );
 
+  const resourceSummaryData: ResourceSummary[] = useMemo(() => 
+    activeResources.map(resource => ({
+      id: resource.id,
+      fullName: resource.fullName,
+      totalCost: calculateTotalByResource(resource.id),
+    })), [activeResources, forecasts, selectedYear]);
+
+  const projectSummaryData: ProjectSummary[] = useMemo(() => 
+    projects.map(project => {
+      const totalCost = calculateTotalByProject(project.pvNumber);
+      return {
+        pvNumber: project.pvNumber,
+        name: project.name,
+        totalCost,
+        budget: project.budget,
+        isOverBudget: project.budget ? totalCost > project.budget : false,
+      };
+    }), [projects, forecasts, resources, selectedYear]);
+
+  const resourceColumns: ColumnDef<ResourceSummary>[] = useMemo(() => [
+    {
+      accessorKey: 'fullName',
+      header: 'Resource',
+      cell: ({ row }) => <span className="font-medium">{row.original.fullName}</span>,
+    },
+    {
+      accessorKey: 'totalCost',
+      header: () => <div className="text-right">Total Cost</div>,
+      cell: ({ row }) => <div className="text-right">${row.original.totalCost.toFixed(2)}</div>,
+    },
+  ], []);
+
+  const projectColumns: ColumnDef<ProjectSummary>[] = useMemo(() => [
+    {
+      accessorKey: 'name',
+      header: 'Project',
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: 'totalCost',
+      header: () => <div className="text-right">Total Cost</div>,
+      cell: ({ row }) => (
+        <div className={`text-right ${row.original.isOverBudget ? 'text-destructive font-semibold' : ''}`}>
+          ${row.original.totalCost.toFixed(2)}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'budget',
+      header: () => <div className="text-right">Budget</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          {row.original.budget ? `$${row.original.budget.toFixed(2)}` : '-'}
+        </div>
+      ),
+    },
+  ], []);
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -92,33 +166,11 @@ const Summary = () => {
               <CardTitle>Forecast by Resource</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Resource</TableHead>
-                    <TableHead className="text-right">Total Cost</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {activeResources.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} className="text-center text-muted-foreground">
-                        No active resources available for {selectedYear}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    activeResources.map((resource) => {
-                      const total = calculateTotalByResource(resource.id);
-                      return (
-                        <TableRow key={resource.id}>
-                          <TableCell className="font-medium">{resource.fullName}</TableCell>
-                          <TableCell className="text-right">${total.toFixed(2)}</TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+              <DataTable
+                columns={resourceColumns}
+                data={resourceSummaryData}
+                emptyMessage={`No active resources available for ${selectedYear}`}
+              />
             </CardContent>
           </Card>
 
@@ -127,40 +179,11 @@ const Summary = () => {
               <CardTitle>Forecast by Project</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Project</TableHead>
-                    <TableHead className="text-right">Total Cost</TableHead>
-                    <TableHead className="text-right">Budget</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {projects.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground">
-                        No projects available
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    projects.map((project) => {
-                      const total = calculateTotalByProject(project.pvNumber);
-                      const isOverBudget = project.budget && total > project.budget;
-                      return (
-                        <TableRow key={project.pvNumber}>
-                          <TableCell className="font-medium">{project.name}</TableCell>
-                          <TableCell className={`text-right ${isOverBudget ? 'text-destructive font-semibold' : ''}`}>
-                            ${total.toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {project.budget ? `$${project.budget.toFixed(2)}` : '-'}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+              <DataTable
+                columns={projectColumns}
+                data={projectSummaryData}
+                emptyMessage="No projects available"
+              />
             </CardContent>
           </Card>
         </div>
