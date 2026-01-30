@@ -1,10 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { Forecast, Resource, Project, Actual } from '@/types';
 
 const tabs = [
   { name: 'Forecasts', path: '/forecasts' },
@@ -14,56 +12,16 @@ const tabs = [
   { name: 'Summary', path: '/summary' },
 ];
 
-export const Navigation = () => {
+interface NavigationProps {
+  selectedYear: number;
+  onYearChange: (year: number) => void;
+  onDownload: () => void;
+}
+
+export const Navigation = ({ selectedYear, onYearChange, onDownload }: NavigationProps) => {
   const location = useLocation();
-  const [selectedYear, setSelectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
-  const [forecasts] = useLocalStorage<Forecast[]>('forecasts', []);
-  const [resources] = useLocalStorage<Resource[]>('resources', []);
-  const [projects] = useLocalStorage<Project[]>('projects', []);
-  const [actuals] = useLocalStorage<Actual[]>('actuals', []);
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i);
-
-  const getTabName = () => {
-    const tab = tabs.find(t => t.path === location.pathname);
-    return tab?.name.toLowerCase() || 'data';
-  };
-
-  const handleDownload = () => {
-    let data: unknown;
-    const tabName = getTabName();
-
-    switch (location.pathname) {
-      case '/forecasts':
-        data = forecasts;
-        break;
-      case '/resources':
-        data = resources;
-        break;
-      case '/projects':
-        data = projects;
-        break;
-      case '/actuals':
-        data = actuals;
-        break;
-      case '/summary':
-        data = { forecasts, resources, projects, actuals };
-        break;
-      default:
-        data = { forecasts, resources, projects, actuals };
-    }
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${tabName}-export.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
 
   return (
     <nav className="border-b bg-card">
@@ -87,7 +45,7 @@ export const Navigation = () => {
                 </Link>
               ))}
             </div>
-            <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+            <Select value={selectedYear.toString()} onValueChange={(value) => onYearChange(parseInt(value))}>
               <SelectTrigger className="w-[120px]">
                 <SelectValue placeholder="Select year" />
               </SelectTrigger>
@@ -99,7 +57,7 @@ export const Navigation = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="icon" onClick={handleDownload} title="Download data as JSON">
+            <Button variant="ghost" size="icon" onClick={onDownload} title="Download data as JSON">
               <Download className="h-4 w-4" />
             </Button>
           </div>

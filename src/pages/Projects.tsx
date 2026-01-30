@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Project } from '@/types';
@@ -13,9 +13,22 @@ import { DataTable } from '@/components/ui/data-table';
 
 const Projects = () => {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
+  const [selectedYear, setSelectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState<Partial<Project>>({});
+
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([JSON.stringify(projects, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'projects-export.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [projects]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,16 +55,16 @@ const Projects = () => {
     setFormData({});
   };
 
-  const handleEdit = (project: Project) => {
+  const handleEdit = useCallback((project: Project) => {
     setEditingProject(project);
     setFormData(project);
     setIsDialogOpen(true);
-  };
+  }, []);
 
-  const handleDelete = (pvNumber: string) => {
+  const handleDelete = useCallback((pvNumber: string) => {
     setProjects(projects.filter(p => p.pvNumber !== pvNumber));
     toast({ title: 'Success', description: 'Project deleted successfully' });
-  };
+  }, [projects, setProjects]);
 
   const openAddDialog = () => {
     setEditingProject(null);
@@ -92,11 +105,11 @@ const Projects = () => {
         </div>
       ),
     },
-  ], []);
+  ], [handleEdit, handleDelete]);
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Navigation selectedYear={selectedYear} onYearChange={setSelectedYear} onDownload={handleDownload} />
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-foreground">Projects</h2>

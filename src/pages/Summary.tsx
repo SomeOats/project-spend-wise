@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { Forecast, Resource, Project } from '@/types';
+import { Forecast, Resource, Project, Actual } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/ui/data-table';
@@ -24,9 +24,22 @@ const Summary = () => {
   const [forecasts] = useLocalStorage<Forecast[]>('forecasts', []);
   const [resources] = useLocalStorage<Resource[]>('resources', []);
   const [projects] = useLocalStorage<Project[]>('projects', []);
-  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
+  const [actuals] = useLocalStorage<Actual[]>('actuals', []);
+  const [selectedYear, setSelectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
 
-  // Filter resources to only show those with end date >= selected year or no end date
+  const handleDownload = useCallback(() => {
+    const data = { forecasts, resources, projects, actuals };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'summary-export.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [forecasts, resources, projects, actuals]);
+
   const activeResources = resources.filter(r => {
     if (!r.endDate) return true;
     const endYear = new Date(r.endDate).getFullYear();
@@ -40,7 +53,6 @@ const Summary = () => {
         const resource = resources.find(r => r.id === resourceId);
         if (!resource) return total;
         
-        // Only sum allocations for the selected year
         const allocationTotal = Object.entries(forecast.allocations)
           .filter(([month]) => new Date(month).getFullYear() === selectedYear)
           .reduce((sum, [_, allocation]) => sum + (resource.rate * allocation) / 100, 0);
@@ -56,7 +68,6 @@ const Summary = () => {
         const resource = resources.find(r => r.id === forecast.resourceId);
         if (!resource) return total;
         
-        // Only sum allocations for the selected year
         const allocationTotal = Object.entries(forecast.allocations)
           .filter(([month]) => new Date(month).getFullYear() === selectedYear)
           .reduce((sum, [_, allocation]) => sum + (resource.rate * allocation) / 100, 0);
@@ -129,7 +140,7 @@ const Summary = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Navigation selectedYear={selectedYear} onYearChange={setSelectedYear} onDownload={handleDownload} />
       <main className="container mx-auto px-4 py-8">
         <h2 className="text-3xl font-bold text-foreground mb-6">Summary</h2>
 

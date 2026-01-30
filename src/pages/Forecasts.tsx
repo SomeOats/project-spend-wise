@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Forecast, Resource, Project } from '@/types';
@@ -9,31 +9,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Trash2, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import {
-  ColumnDef,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/ui/data-table';
 
 const Forecasts = () => {
   const [forecasts, setForecasts] = useLocalStorage<Forecast[]>('forecasts', []);
   const [resources] = useLocalStorage<Resource[]>('resources', []);
   const [projects] = useLocalStorage<Project[]>('projects', []);
-  const [selectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
+  const [selectedYear, setSelectedYear] = useLocalStorage<number>('selectedYear', new Date().getFullYear());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedResource, setSelectedResource] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
 
-  // Filter resources to only show those with end date >= selected year or no end date
+  const handleDownload = useCallback(() => {
+    const blob = new Blob([JSON.stringify(forecasts, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'forecasts-export.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [forecasts]);
+
   const activeResources = resources.filter(r => {
     if (!r.endDate) return true;
     const endYear = new Date(r.endDate).getFullYear();
@@ -69,12 +68,12 @@ const Forecasts = () => {
     toast({ title: 'Success', description: 'Forecast added successfully' });
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     setForecasts(forecasts.filter(f => f.id !== id));
     toast({ title: 'Success', description: 'Forecast deleted successfully' });
-  };
+  }, [forecasts, setForecasts]);
 
-  const handleAllocationChange = (forecastId: string, month: string, allocation: number) => {
+  const handleAllocationChange = useCallback((forecastId: string, month: string, allocation: number) => {
     setForecasts(forecasts.map(f => {
       if (f.id === forecastId) {
         return {
@@ -87,7 +86,7 @@ const Forecasts = () => {
       }
       return f;
     }));
-  };
+  }, [forecasts, setForecasts]);
 
   const calculateMonthlyCost = (forecast: Forecast, month: string): number => {
     const resource = resources.find(r => r.id === forecast.resourceId);
@@ -99,7 +98,6 @@ const Forecasts = () => {
   const getResourceName = (id: string) => resources.find(r => r.id === id)?.fullName || 'Unknown';
   const getProjectName = (pvNumber: string) => projects.find(p => p.pvNumber === pvNumber)?.name || 'Unknown';
 
-  // Generate all 12 months for the selected year
   const months = Array.from({ length: 12 }, (_, i) => {
     const month = (i + 1).toString().padStart(2, '0');
     return `${selectedYear}-${month}`;
@@ -152,17 +150,11 @@ const Forecasts = () => {
         </Button>
       ),
     },
-  ], [months, resources, projects]);
-
-  const table = useReactTable({
-    data: forecasts,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
+  ], [months, resources, projects, handleAllocationChange, handleDelete]);
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      <Navigation selectedYear={selectedYear} onYearChange={setSelectedYear} onDownload={handleDownload} />
       <main className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-3xl font-bold text-foreground">Forecasts</h2>
@@ -225,45 +217,13 @@ const Forecasts = () => {
               : 'Please add resources and projects before creating forecasts.'}
           </div>
         ) : (
-          <div className="rounded-md border overflow-auto max-h-[calc(100vh-200px)]">
-            <Table>
-              <TableHeader className="sticky top-0 z-10 bg-muted">
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow key={row.id}>
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
-                      No forecasts found. Add your first forecast to get started.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            columns={columns}
+            data={forecasts}
+            emptyMessage="No forecasts found. Add your first forecast to get started."
+            stickyHeader
+            maxHeight="calc(100vh - 200px)"
+          />
         )}
       </main>
     </div>
