@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Resource } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/ui/data-table';
 
 const Resources = () => {
   const [resources, setResources] = useLocalStorage<Resource[]>('resources', []);
@@ -74,6 +75,55 @@ const Resources = () => {
     setFormData({ location: 'Onshore' });
     setIsDialogOpen(true);
   };
+
+  const columns: ColumnDef<Resource>[] = useMemo(() => [
+    {
+      accessorKey: 'id',
+      header: 'ID',
+      cell: ({ row }) => <span className="font-medium">{row.original.id}</span>,
+    },
+    {
+      accessorKey: 'fullName',
+      header: 'Full Name',
+    },
+    {
+      accessorKey: 'rate',
+      header: 'Rate',
+      cell: ({ row }) => `$${row.original.rate.toFixed(2)}`,
+    },
+    {
+      accessorKey: 'location',
+      header: 'Location',
+    },
+    {
+      accessorKey: 'company',
+      header: 'Company',
+    },
+    {
+      accessorKey: 'startDate',
+      header: 'Start Date',
+      cell: ({ row }) => row.original.startDate || '-',
+    },
+    {
+      accessorKey: 'endDate',
+      header: 'End Date',
+      cell: ({ row }) => row.original.endDate || '-',
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-right">Actions</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Button variant="ghost" size="icon" onClick={() => handleEdit(row.original)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => handleDelete(row.original.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ], []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -178,51 +228,11 @@ const Resources = () => {
           </Dialog>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Full Name</TableHead>
-                <TableHead>Rate</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead>End Date</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedResources.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No active resources found for {selectedYear}. Resources must have an end date in or after {selectedYear}.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                displayedResources.map((resource) => (
-                  <TableRow key={resource.id}>
-                    <TableCell className="font-medium">{resource.id}</TableCell>
-                    <TableCell>{resource.fullName}</TableCell>
-                    <TableCell>${resource.rate.toFixed(2)}</TableCell>
-                    <TableCell>{resource.location}</TableCell>
-                    <TableCell>{resource.company}</TableCell>
-                    <TableCell>{resource.startDate || '-'}</TableCell>
-                    <TableCell>{resource.endDate || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(resource)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(resource.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={displayedResources}
+          emptyMessage={`No active resources found for ${selectedYear}. Resources must have an end date in or after ${selectedYear}.`}
+        />
       </main>
     </div>
   );

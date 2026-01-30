@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Pencil, Trash2, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { ColumnDef } from '@tanstack/react-table';
+import { DataTable } from '@/components/ui/data-table';
 
 const Projects = () => {
   const [projects, setProjects] = useLocalStorage<Project[]>('projects', []);
@@ -57,6 +58,41 @@ const Projects = () => {
     setFormData({});
     setIsDialogOpen(true);
   };
+
+  const columns: ColumnDef<Project>[] = useMemo(() => [
+    {
+      accessorKey: 'pvNumber',
+      header: 'PV Number',
+      cell: ({ row }) => <span className="font-medium">{row.original.pvNumber}</span>,
+    },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+    },
+    {
+      accessorKey: 'oracleAccount',
+      header: 'Oracle Account',
+    },
+    {
+      accessorKey: 'budget',
+      header: 'Budget',
+      cell: ({ row }) => row.original.budget ? `$${row.original.budget.toFixed(2)}` : '-',
+    },
+    {
+      id: 'actions',
+      header: () => <div className="text-right">Actions</div>,
+      cell: ({ row }) => (
+        <div className="text-right">
+          <Button variant="ghost" size="icon" onClick={() => handleEdit(row.original)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => handleDelete(row.original.pvNumber)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ], []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,45 +160,11 @@ const Projects = () => {
           </Dialog>
         </div>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>PV Number</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Oracle Account</TableHead>
-                <TableHead>Budget</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    No projects found. Add your first project to get started.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                projects.map((project) => (
-                  <TableRow key={project.pvNumber}>
-                    <TableCell className="font-medium">{project.pvNumber}</TableCell>
-                    <TableCell>{project.name}</TableCell>
-                    <TableCell>{project.oracleAccount}</TableCell>
-                    <TableCell>${project.budget?.toFixed(2) || '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(project)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(project.pvNumber)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={projects}
+          emptyMessage="No projects found. Add your first project to get started."
+        />
       </main>
     </div>
   );
